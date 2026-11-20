@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>客户登记 · 测试版</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="head">
+    <h1>客户登记</h1>
+    <p class="sub">提交后直接写入 Supabase，支持按公司名 / 产品 / 地址搜索</p>
+  </header>
+
+  <div id="config-error" class="banner banner-error" hidden></div>
+
+  <!-- 表单 -->
+  <section class="card">
+    <h2>新增客户</h2>
+    <form id="customer-form" autocomplete="off" novalidate>
+      <div class="grid">
+        <label class="field">
+          <span>公司名 <b class="req">*</b></span>
+          <input id="f-company" name="company_name" maxlength="120" required placeholder="例如 Nordic Home AB">
+        </label>
+
+        <label class="field">
+          <span>产品</span>
+          <input id="f-product" name="product" maxlength="200" placeholder="例如 蓝牙耳机 / 户外家具">
+        </label>
+
+        <label class="field">
+          <span>KP</span>
+          <input id="f-kp" name="kp" maxlength="80" placeholder="联系人姓名 / 职位">
+        </label>
+
+        <label class="field">
+          <span>官网</span>
+          <input id="f-website" name="website" maxlength="200" placeholder="example.com">
+        </label>
+
+        <label class="field field-wide">
+          <span>地址</span>
+          <input id="f-address" name="address" maxlength="300" placeholder="城市 / 国家 / 详细地址">
+        </label>
+      </div>
+
+      <div class="actions">
+        <button type="submit" id="btn-submit" class="btn btn-primary">提交保存</button>
+        <button type="reset" id="btn-reset" class="btn">清空</button>
+        <span id="form-msg" class="msg" role="status"></span>
+      </div>
+    </form>
+  </section>
+
+  <!-- 搜索 + 列表 -->
+  <section class="card">
+    <div class="list-head">
+      <h2>已存客户</h2>
+      <span id="count" class="count"></span>
+    </div>
+
+    <div class="searchbar">
+      <select id="search-field" aria-label="搜索字段">
+        <option value="all">全部字段</option>
+        <option value="company_name">公司名</option>
+        <option value="product">产品</option>
+        <option value="address">地址</option>
+      </select>
+      <input id="search-input" type="search" placeholder="输入关键词，边打边搜…" autocomplete="off">
+      <button id="btn-refresh" class="btn" type="button" title="重新加载">刷新</button>
+    </div>
+
+    <div id="status" class="msg" role="status"></div>
+    <div id="list" class="list"></div>
+
+    <div class="pager">
+      <button id="btn-prev" class="btn" type="button">上一页</button>
+      <span id="page-info" class="page-info"></span>
+      <button id="btn-next" class="btn" type="button">下一页</button>
+    </div>
+  </section>
+
+  <p class="foot">测试版：无需登录，任何人都能提交和查看。正式使用前请加登录与权限控制。</p>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
