@@ -3,6 +3,9 @@
 一个页面搞定：填表单 → 存 Supabase → 按公司名 / 产品 / 地址搜索。
 纯静态文件，不需要服务器、不需要构建工具、不需要装 npm 包。
 
+**线上地址**：https://pengyuanbruce.github.io/crm-test/
+（GitHub Pages，推送 `main` 后约 1 分钟自动重新部署）
+
 ## 文件说明
 
 | 文件 | 作用 | 要不要改 |
@@ -78,6 +81,27 @@ python -m http.server 5173
 1. 打开 Supabase Auth，登录后才能写
 2. 把策略从 `anon` 改成 `authenticated`
 3. 加个删除按钮（限定登录用户）
+
+## 后续更新怎么发布
+
+```bash
+git add -A
+git commit -m "说明这次改了什么"
+git push
+```
+
+推送后 GitHub Pages 会自动重新构建，约 1 分钟生效。看构建状态：仓库 → Actions → pages build and deployment。
+
+## 仓库为什么是 Public
+
+GitHub Pages 免费版只支持**公开仓库**。这意味着：
+
+- 页面源码（含 `config.js` 里的 anon key）任何人都能看到
+- `anon key` 本来就是设计成公开的前端密钥，安全性靠数据库的 RLS 策略，不是靠隐藏它
+- 但当前策略允许匿名 insert / select，所以**别人也能往你的表里写数据**
+- 结论：这个仓库适合测试和演示，**不要放真实客户数据**
+
+要私有仓库 + 在线访问，需要 GitHub Pro，或改用 Vercel / Cloudflare Pages 连私有仓库（国内访问 vercel 域名不稳定，Cloudflare 相对好些）。
 
 ## 下一步可以加（按性价比排序）
 
