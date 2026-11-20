@@ -43,5 +43,13 @@ create policy "anon can read"
   to anon, authenticated
   using (true);
 
--- 自检：下面这句应该返回 0 行（证明没有开放修改权限）
--- select * from pg_policies where tablename = 'customers';
+-- ------------------------------------------------------------
+-- 表权限（关键）
+-- 新版 Supabase 项目建表后不会自动给 anon / authenticated 授权，
+-- 必须显式 GRANT；这里只给「读」和「写」，不给 update / delete
+-- ------------------------------------------------------------
+grant usage on schema public to anon, authenticated;
+grant select, insert on public.customers to anon, authenticated;
+
+-- 自检：应能看到 2 行（anon can insert / anon can read）
+-- select policyname, cmd, roles from pg_policies where tablename = 'customers';
