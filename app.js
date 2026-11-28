@@ -146,6 +146,13 @@
     return max ? s.slice(0, max) : s;
   }
 
+  // 备注保留换行，只压缩多余空行
+  function cleanNote(value, max) {
+    var s = String(value == null ? '' : value).replace(/\r\n/g, '\n').trim();
+    s = s.replace(/\n{3,}/g, '\n\n');
+    return max ? s.slice(0, max) : s;
+  }
+
   function sanitizeKeyword(q) {
     return String(q).replace(/[,()%"\\*]/g, ' ').replace(/\s+/g, ' ').trim();
   }
@@ -217,11 +224,150 @@
     var meta = document.createElement('div');
     meta.className = 'item-meta';
     meta.appendChild(metaRow('KP', c.kp, false));
+    meta.appendChild(metaRow('跟进销售', c.sales_owner, false));
     meta.appendChild(metaRow('官网', c.website, true));
     meta.appendChild(metaRow('地址', c.address, false));
     wrap.appendChild(meta);
 
+    wrap.appendChild(noteBlock(c));
+
     return wrap;
+  }
+
+  /* ---------- 情况备注：列表内直接编辑 ---------- */
+  function noteBlock(c) {
+    var box = document.createElement('div');
+    box.className = 'note-box';
+    renderNote(box, c);
+    return box;
+  }
+
+  function renderNote(box, c) {
+    box.innerHTML = '';
+
+    var head = document.createElement('div');
+    head.className = 'note-head';
+
+    var label = document.createElement('span');
+    label.textContent = '情况备注';
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'link-btn';
+    btn.textContent = c.note ? '编辑' : '添加备注';
+
+    head.appendChild(label);
+    head.appendChild(btn);
+    box.appendChild(head);
+
+    var body = document.createElement('div');
+    body.className = 'note-body' + (c.note ? '' : ' note-empty');
+    body.textContent = c.note || '暂无';
+    box.appendChild(body);
+
+    btn.addEventListener('click', function () { editNote(box, c); });
+  }
+
+  function editNote(box, c) {
+    box.innerHTML = '';
+
+    var head = document.createElement('div');
+    head.className = 'note-head';
+    var label = document.createElement('span');
+    label.textContent = '情况备注';
+    var tip = document.createElement('span');
+    tip.textContent = 'Ctrl + Enter 保存';
+    head.appendChild(label);
+    head.appendChild(tip);
+    box.appendChild(head);
+
+    var ta = document.createElement('textarea');
+    ta.className = 'note-input';
+    ta.rows = 3;
+    ta.maxLength = 2000;
+    ta.value = c.note || '';
+    box.appendChild(ta);
+
+    var actions = document.createElement('div');
+    actions.className = 'note-actions';
+
+    var save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'btn btn-primary btn-sm';
+    save.textContent = '保存';
+
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn btn-sm';
+    cancel.textContent = '取消';
+
+    var msg = document.createElement('span');
+    msg.className = 'msg';
+
+    actions.appendChild(save);
+    actions.appendChild(cancel);
+    actions.appendChild(msg);
+    box.appendChild(actions);
+
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+
+    function close() { renderNote(box, c); }
+
+    cancel.addEventListener('click', close);
+
+    ta.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        commit();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    });
+
+    function commit() {
+      var val = cleanNote(ta.value, 2000);
+      save.disabled = true;
+      cancel.disabled = true;
+      msg.textContent = '保存中…';
+
+      db.from('customers')
+        .update({ note: val || null })
+        .eq('id', c.id)
+        .select()
+        .then(function (res) {
+          save.disabled = false;
+          cancel.disabled = false;
+
+          if (res.error) {
+            if (/JWT|401|permission|not authorized/i.test(res.error.message || '')) {
+              showLogin();
+              setLoginMsg('登录已过期，请重新登录', 'err');
+              return;
+            }
+            msg.textContent = '保存失败：' + res.error.message;
+            msg.className = 'msg err';
+            return;
+          }
+
+          if (!res.data || !res.data.length) {
+            msg.textContent = '没有更新到记录';
+            msg.className = 'msg err';
+            return;
+          }
+
+          c.note = res.data[0].note;
+          renderNote(box, c);
+        }, function (err) {
+          save.disabled = false;
+          cancel.disabled = false;
+          msg.textContent = '网络错误：' + (err && err.message ? err.message : err);
+          msg.className = 'msg err';
+        });
+    }
+
+    save.addEventListener('click', commit);
   }
 
   /* ---------- 查询 ---------- */
@@ -331,7 +477,9 @@
       product: clean($('f-product').value, 200),
       kp: clean($('f-kp').value, 80),
       website: clean($('f-website').value, 200),
-      address: clean($('f-address').value, 300)
+      address: clean($('f-address').value, 300),
+      sales_owner: clean($('f-sales').value, 80),
+      note: cleanNote($('f-note').value, 2000)
     };
 
     Object.keys(payload).forEach(function (k) {
