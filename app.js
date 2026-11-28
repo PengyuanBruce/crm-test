@@ -386,6 +386,7 @@
         q = q.or(
           'company_name.ilike.%' + state.keyword + '%,' +
           'product.ilike.%' + state.keyword + '%,' +
+          'sales_owner.ilike.%' + state.keyword + '%,' +
           'address.ilike.%' + state.keyword + '%'
         );
       } else {
