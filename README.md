@@ -65,22 +65,52 @@ python -m http.server 5173
 | `new row violates row-level security policy` | 开了 RLS 但没建策略 | `schema.sql` 里的 policy 部分没执行成功，重跑 |
 | `Invalid API key` | key 抄漏、多了空格、或用了错的 key | 重新复制 anon public key |
 | `Failed to fetch` / CORS | 用 `file://` 打开，或项目被暂停 | 用 `http.server` 打开；去 Dashboard 看项目是否 Active |
-| 提交成功但列表没数据 | 策略只给了 insert 没给 select | 确认 `anon can read` 策略存在 |
+| 提交成功但列表没数据 | 策略只给了 insert 没给 select | 确认 `auth can read` 策略存在 |
+| `Invalid login credentials` | 账号不存在或密码错 | 去 Authentication → Users 确认用户存在且密码正确 |
+| `Email not confirmed` | 建用户时没勾 Auto Confirm | Dashboard → Users 里点该用户重新确认 |
+| 登录成功但列表报 401 / permission denied | 没跑 `migration-login.sql`，`authenticated` 没权限 | 补跑迁移 SQL |
 | 搜索输中文搜不到 | 关键词带逗号 `,` `(` `)` 会被过滤 | 换掉这些字符，或只输纯文字 |
 
-## 这个版本的安全边界（务必知道）
+## 登录（当前版本已启用）
 
-免登录 = 任何拿到页面的人都能**读全表、写新行**。这是你要求的测试形态，但要知道代价：
+页面现在需要登录才能看到任何数据。三件事：
 
-- 前端 `anon key` 是公开的，别人可以直接对你的表刷数据
-- 所以策略里**故意没给 update / delete**，最坏情况是被人塞垃圾行，不会被篡改或清空
-- **不要放真实客户手机号、真实合同信息**。测试用公司名和公开官网足够
-- 表格如果被刷爆，Dashboard → Table Editor 里逐条删，或者 `truncate table public.customers;`
+### 1. 建唯一的那个账号
+Supabase → **Authentication** → **Users** → **Add user** →
 
-正式版要做的三件事，都很小：
-1. 打开 Supabase Auth，登录后才能写
-2. 把策略从 `anon` 改成 `authenticated`
-3. 加个删除按钮（限定登录用户）
+- Email：你的登录邮箱
+- Password：自己设一个强密码
+- 勾上 **Auto Confirm User**（否则会要求点邮件里的确认链接）
+- Create user
+
+### 2. 收紧数据库权限（关键）
+SQL Editor 里跑 `migration-login.sql`。它做两件事：删掉匿名策略、收回 `anon` 的表权限，只给 `authenticated` 授权。
+
+**不跑这一步等于没加登录**——页面虽然挡住了，但拿着公开的 publishable key 直接请求 API 仍能读全表。
+
+### 3. （可选）让登录页只剩密码框
+把账号邮箱填进 `config.js` 的 `LOGIN_EMAIL`：
+
+```js
+LOGIN_EMAIL: 'you@example.com'
+```
+
+填了之后账号自动带入，页面只显示密码输入框。留空则显示账号 + 密码两个框，效果一样。
+
+### 登录相关的行为
+- 登录状态存在浏览器 localStorage，关掉再开不用重登
+- token 会自动续期；续期失败或权限被收回时，页面自动退回登录页并提示"登录已过期"
+- 右上角「退出登录」
+- 只有你要加多个账号时才需要在 Users 里继续加人；一个账号够用就一直只有一个
+
+## 安全边界
+
+现在数据是登录后才可读的，但仍有边界：
+
+- 前端 `publishable key` 是公开的，**安全性完全依赖 `migration-login.sql` 里的 RLS 与 GRANT**，不是靠隐藏 key
+- 账号只有一个，密码强度直接等于数据安全等级，别用 `123456`
+- 忘记密码：Supabase 内置发信每小时只有几封且只适合测试，最省事的办法是去 Dashboard → Users 直接重设密码
+- 仍然**不建议**存身份证号、合同原件、付款信息这类高敏数据
 
 ## 后续更新怎么发布
 
@@ -105,8 +135,8 @@ GitHub Pages 免费版只支持**公开仓库**。这意味着：
 
 ## 下一步可以加（按性价比排序）
 
-1. **删除按钮**（半小时）
+1. **删除按钮**（半小时，权限已给到 `authenticated`，加个按钮即可）
 2. **CSV 导出 / 导入**（一小时，日常最有用）
-3. **登录 + 5 人账号**（半天，从测试版过渡到正式版）
+3. **多账号 + 角色**（半天，需要 `profiles` 表区分管理员和只读）
 4. 公司名重复提示（提交前查一次同名）
-5. 部署到 Cloudflare Pages，把目录直接拖上去就是线上地址
+5. 忘记密码邮件（配 Resend SMTP 后可用）
