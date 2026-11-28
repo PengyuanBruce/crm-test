@@ -1,6 +1,6 @@
-/* 客户登记 · 免登录测试版
-   数据流：表单 → supabase.from('customers').insert() → 重新查询列表
-   搜索：服务端过滤（PostgREST ilike），不是前端过滤 */
+/* 客户登记 · 带登录的测试版
+   认证：Supabase Auth（邮箱 + 密码），前端只持有公开的 publishable key
+   数据：登录后由 RLS 放出权限，未登录的匿名请求会被数据库拒绝 */
 
 (function () {
   'use strict';
@@ -9,9 +9,37 @@
   var cfg = window.APP_CONFIG || {};
   var url = String(cfg.SUPABASE_URL || '').trim();
   var key = String(cfg.SUPABASE_ANON_KEY || '').trim();
+  var loginEmail = String(cfg.LOGIN_EMAIL || '').trim();
 
   var db = null;
-  var state = { page: 0, pageSize: 20, total: 0, keyword: '', field: 'all', loading: false };
+  var state = { page: 0, pageSize: 20, total: 0, keyword: '', field: 'all' };
+  var reqSeq = 0;
+
+  /* ---------- 界面切换 ---------- */
+  function showLogin() {
+    $('app-screen').hidden = true;
+    $('login-screen').hidden = false;
+    $('btn-logout').hidden = true;
+    $('list').innerHTML = '';
+    $('status').textContent = '';
+    $('count').textContent = '';
+    $('page-info').textContent = '';
+    state.page = 0;
+    state.keyword = '';
+    $('search-input').value = '';
+  }
+
+  function showApp() {
+    $('login-screen').hidden = true;
+    $('app-screen').hidden = false;
+    $('btn-logout').hidden = false;
+  }
+
+  function setLoginMsg(text, kind) {
+    var el = $('login-msg');
+    el.textContent = text || '';
+    el.className = 'msg' + (kind ? ' ' + kind : '');
+  }
 
   /* ---------- 初始化 ---------- */
   var banner = $('config-error');
@@ -20,16 +48,85 @@
 
   if (notConfigured) {
     banner.hidden = false;
-    banner.textContent = '还没配置 Supabase：打开 config.js，把 Project URL 和 anon key 填进去，保存后刷新本页。';
-    $('btn-submit').disabled = true;
-  } else if (!window.supabase || !window.supabase.createClient) {
+    banner.textContent = '还没配置 Supabase：打开 config.js，把 Project URL 和 publishable key 填进去，保存后刷新本页。';
+    return;
+  }
+
+  if (!window.supabase || !window.supabase.createClient) {
     banner.hidden = false;
     banner.textContent = 'supabase-js 没加载成功，检查网络或 CDN 是否被拦截。';
-    $('btn-submit').disabled = true;
-  } else {
-    db = window.supabase.createClient(url, key);
-    load();
+    return;
   }
+
+  db = window.supabase.createClient(url, key);
+
+  // 配了固定账号就藏掉邮箱输入框
+  if (loginEmail) {
+    $('email-field').style.display = 'none';
+    $('l-email').value = loginEmail;
+  }
+
+  db.auth.getSession().then(function (res) {
+    var session = res && res.data && res.data.session;
+    if (session) {
+      showApp();
+      load();
+    } else {
+      showLogin();
+      $('l-password').focus();
+    }
+  }, function () {
+    showLogin();
+  });
+
+  // 别的标签页退出时同步回登录页
+  db.auth.onAuthStateChange(function (event, session) {
+    if (event === 'SIGNED_OUT' || !session) {
+      showLogin();
+    }
+  });
+
+  /* ---------- 登录 / 退出 ---------- */
+  $('login-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    var email = loginEmail || clean($('l-email').value, 120);
+    var password = $('l-password').value || '';
+
+    if (!email) { setLoginMsg('请输入账号', 'err'); return; }
+    if (!password) { setLoginMsg('请输入密码', 'err'); $('l-password').focus(); return; }
+
+    $('btn-login').disabled = true;
+    setLoginMsg('登录中…');
+
+    db.auth.signInWithPassword({ email: email, password: password }).then(function (res) {
+      $('btn-login').disabled = false;
+
+      if (res.error) {
+        var m = res.error.message || '登录失败';
+        if (/invalid login credentials/i.test(m)) m = '账号或密码错误';
+        else if (/email not confirmed/i.test(m)) m = '账号未确认，去 Supabase → Authentication → Users 里确认该用户';
+        setLoginMsg(m, 'err');
+        $('l-password').select();
+        return;
+      }
+
+      $('l-password').value = '';
+      setLoginMsg('');
+      showApp();
+      load();
+    }, function (err) {
+      $('btn-login').disabled = false;
+      setLoginMsg('网络错误：' + (err && err.message ? err.message : err), 'err');
+    });
+  });
+
+  $('btn-logout').addEventListener('click', function () {
+    db.auth.signOut().then(function () {
+      showLogin();
+      setLoginMsg('已退出登录');
+    });
+  });
 
   /* ---------- 工具 ---------- */
   function setStatus(text, kind) {
@@ -49,7 +146,6 @@
     return max ? s.slice(0, max) : s;
   }
 
-  // PostgREST 的 or() 用逗号和括号做语法分隔，关键词里出现这些字符会炸
   function sanitizeKeyword(q) {
     return String(q).replace(/[,()%"\\*]/g, ' ').replace(/\s+/g, ' ').trim();
   }
@@ -153,17 +249,21 @@
     return q;
   }
 
-  var reqSeq = 0;
-
   function load() {
     if (!db) return;
-    var seq = ++reqSeq;          // 只认最后一次请求，避免边打边搜时结果乱序
+    var seq = ++reqSeq;
     setStatus('加载中…');
 
     buildQuery().then(function (res) {
       if (seq !== reqSeq) return;
 
       if (res.error) {
+        // 会话过期或权限被收回 → 回登录页
+        if (/JWT|401|permission|not authorized/i.test(res.error.message || '')) {
+          showLogin();
+          setLoginMsg('登录已过期，请重新登录', 'err');
+          return;
+        }
         setStatus('查询失败：' + res.error.message, 'err');
         renderList([], true);
         return;
@@ -234,7 +334,6 @@
       address: clean($('f-address').value, 300)
     };
 
-    // 空串统一存 null，搜索时不会被空值干扰
     Object.keys(payload).forEach(function (k) {
       if (payload[k] === '') payload[k] = null;
     });
@@ -246,6 +345,11 @@
       btnSubmit.disabled = false;
 
       if (res.error) {
+        if (/JWT|401|permission|not authorized/i.test(res.error.message || '')) {
+          showLogin();
+          setLoginMsg('登录已过期，请重新登录', 'err');
+          return;
+        }
         setFormMsg('保存失败：' + res.error.message, 'err');
         return;
       }
