@@ -24,8 +24,33 @@ body {
 
 .wrap { max-width: 860px; margin: 0 auto; padding: 28px 18px 60px; }
 
+[hidden] { display: none !important; }
+
+.head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .head h1 { margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -.01em; }
-.sub { margin: 0 0 20px; color: var(--muted); font-size: 13.5px; }
+.sub { margin: 8px 0 20px; color: var(--muted); font-size: 13.5px; }
+
+.login-card {
+  max-width: 380px;
+  margin: 28px auto;
+}
+
+.login-card .field + .field { margin-top: 12px; }
+.login-card .actions { margin-top: 18px; }
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  padding: 6px 10px;
+}
+.btn-ghost:hover:not(:disabled) { background: #eceef2; }
 
 .card {
   background: var(--card);
