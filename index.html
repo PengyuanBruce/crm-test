@@ -15,7 +15,7 @@
       <h1>客户登记</h1>
       <button id="btn-logout" class="btn btn-ghost" type="button" hidden>退出登录</button>
     </div>
-    <p class="sub">提交后直接写入 Supabase，支持按公司名 / 产品 / 地址搜索</p>
+    <p class="sub">提交后直接写入 Supabase，支持按公司名 / 产品 / 跟进销售 / 地址搜索</p>
   </header>
 
   <div id="config-error" class="banner banner-error" hidden></div>
@@ -104,6 +104,7 @@
           <option value="all">全部字段</option>
           <option value="company_name">公司名</option>
           <option value="product">产品</option>
+          <option value="sales_owner">跟进销售</option>
           <option value="address">地址</option>
         </select>
         <input id="search-input" type="search" placeholder="输入关键词，边打边搜…" autocomplete="off">
