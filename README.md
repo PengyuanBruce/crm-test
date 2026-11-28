@@ -15,6 +15,8 @@
 | `app.js` | 提交、查询、分页、搜索逻辑 | 不用 |
 | `config.js` | **Supabase 地址和 key** | ✅ 只改这个 |
 | `schema.sql` | 建表 + 权限 SQL | 粘到 Supabase 执行一次 |
+| `migration-login.sql` | 加登录后收紧权限 | 粘到 SQL Editor 执行一次 |
+| `migration-sales-note.sql` | 加「跟进销售」「情况备注」两列 | 粘到 SQL Editor 执行一次 |
 
 ## 四步跑起来
 
@@ -62,6 +64,7 @@ python -m http.server 5173
 | 报错信息 | 原因 | 处理 |
 |---|---|---|
 | `relation "public.customers" does not exist` | 没执行建表 SQL | 跑一遍 `schema.sql` |
+| `column "sales_owner" does not exist` | 没执行加字段的迁移 | 跑 `migration-sales-note.sql` |
 | `new row violates row-level security policy` | 开了 RLS 但没建策略 | `schema.sql` 里的 policy 部分没执行成功，重跑 |
 | `Invalid API key` | key 抄漏、多了空格、或用了错的 key | 重新复制 anon public key |
 | `Failed to fetch` / CORS | 用 `file://` 打开，或项目被暂停 | 用 `http.server` 打开；去 Dashboard 看项目是否 Active |
